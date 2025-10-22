@@ -68,7 +68,8 @@ outRoot = args.outDir
 leadtimes = [1,2,4,6]
 
 
-#realtime: get most recently added file
+
+# realtime: get most recently added file
 if mode=='realtime':
     total_files=glob.glob(os.path.join(dataDir,'IR_108*'))
     new_dates = []
