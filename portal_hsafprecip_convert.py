@@ -76,6 +76,13 @@ cutout = [2717,638,320,2587]
 nx = cutout[3] - cutout[2]+1 #2268
 ny = cutout[0]-cutout[1]+1  #2080
 
+
+cutout =[638,2717,3712-320,3712-2587]
+
+nx = cutout[2]- cutout[3]+1 #2268
+ny = cutout[1]-cutout[0]+1  #2080
+
+print(nx,ny)
 # NFLICS variables
 plot_area_ex = [-41,-27,27,79]
 nflics_base="/mnt/users/hymod/seodey/NFLICS/" 
@@ -128,6 +135,8 @@ class extendedCoreCalc():
        # plt.imshow(self.data_all_ex)
         #plt.show()
         data_interp_ex=uinterp.interpolate_data(self.data_all_ex, inds_ex, weights_ex, new_shape_ex)
+
+        
        # plt.imshow(data_interp_ex)
        # plt.show()
         if args.getPoints:
@@ -186,7 +195,7 @@ def update_accumulations(hsafNow,tnow,plotdir,tmpdir,inds_ex, weights_ex, new_sh
         try:
             with gzip.open(ifile) as gz:
                 with nc.Dataset('dummy',more='r',memory=gz.read()) as ncFile:         
-                    iacc =ncFile.variables['rr'][:,:]	
+                    iacc =ncFile.variables['rr'][::-1,:]	
                    
         except:
             print("Missing file "+ifile)
@@ -197,7 +206,9 @@ def update_accumulations(hsafNow,tnow,plotdir,tmpdir,inds_ex, weights_ex, new_sh
             print(acchr)
             accArr_i = np.array(np.round(0.25*np.add(accArray,iacc/2.0),2))
             accArr_i[accArr_i < 1] = 0.0
-            accArr_i = accArr_i[(cutout[1]):(cutout[0]+1),(cutout[2]-1):(cutout[3])][:,::-1]
+            #########accArr_i = accArr_i[(cutout[1]):(cutout[0]+1),(cutout[2]-1):(cutout[3])][:,::-1]
+            accArr_i = accArr_i[(cutout[0]):(cutout[1]+1),(cutout[3]-1):(cutout[2])][:,:]
+            
             accArr_i = accArr_i[grid_lims_ex[0]:grid_lims_ex[2],grid_lims_ex[1]:grid_lims_ex[3]]
             accArr_i_const=uinterp.interpolate_data(accArr_i, inds_ex, weights_ex, new_shape_ex)	
             if toSdir:
@@ -252,6 +263,7 @@ def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',rep
         ds = None 
     if trim:
         os.system('rm '+rasFile2)
+    os.system('chmod a+rw '+reprojFile)
 
 
 def process_grid_info(nx,ny,nx_dakarstrip,ny_dakarstrip,blob_dx,plot_area,nflics_base):
@@ -422,14 +434,17 @@ for rfile in rfiles:
         with gzip.open(rfile) as gz:
             with nc.Dataset('dummy',more='r',memory=gz.read()) as ncFile:
 
-                fSize = [ncFile.dimensions['y'].size,ncFile.dimensions['x'].size]
-                rr_full = ncFile.variables['rr']
-            #rr = rr_full[(cutout[1]):(cutout[0]+1),(cutout[2]-1):(cutout[3])][:,::-1]
-                rr = rr_full[(cutout[1]):(cutout[0]+1),(cutout[2]-1):(cutout[3])][:,::-1]
+                fSize = [ncFile.dimensions['ny'].size,ncFile.dimensions['nx'].size]
+                rr_full = ncFile.variables['rr'][::-1,:]
+
+                ###########rr = rr_full[(cutout[1]):(cutout[0]+1),(cutout[2]-1):(cutout[3])][:,::-1]
+                rr = rr_full[(cutout[0]):(cutout[1]+1),(cutout[3]-1):(cutout[2])][:,:]
+
                 indx_full =ncFile.variables['qind']
                 #for name, variable in ncFile.variables['rr']:
             #indx = indx_full[(cutout[1]):(cutout[0]+1),(cutout[2]-1):(cutout[3])][:,::-1]
-                indx = indx_full[(cutout[1]):(cutout[0]+1),(cutout[2]-1):(cutout[3])][:,::-1]
+                ############indx = indx_full[(cutout[1]):(cutout[0]+1),(cutout[2]-1):(cutout[3])][:,::-1]
+                indx = indx_full[(cutout[0]):(cutout[1]+1),(cutout[3]-1):(cutout[2])][:,:]
             # make a tif
                 #geotiff_outpath = '/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data/'
                 #geotiff_outpath = '/home/stewells/AfricaNowcasting/satTest/geotiff/ssa_hsaf_precip'        

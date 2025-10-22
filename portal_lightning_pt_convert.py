@@ -154,7 +154,8 @@ elif args.mode=='realtime':
 # new_files = [lis of datetimes of the files that exists (As string)]
 
 if len(new_files)==0:
-     		print("No new files to process")
+    print("No new files to process")
+    sys.exit(0)
 
 # sort acording to date
 sorted_pairs = sorted(zip(new_files,exist_files))
