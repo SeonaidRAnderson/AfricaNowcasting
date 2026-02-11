@@ -165,8 +165,10 @@ for FFILE in "${FILES[@]}"
           echo $fullfile
 
 
-          echo "TRANSLATE"
+#          echo "TRANSLATE"
           gdal_translate -of VRT $tmptif $tmpvrt
+          gdal_translate  -co compress=LZW -co TILED=YES -co BLOCKXSIZE=512 -co BLOCKYSIZE=512 -co PREDICTOR=2 $newfile_pre $newfile_ready
+          gdaladdo -r average $newfile_ready 2 4 8 16 32
 
 
 
