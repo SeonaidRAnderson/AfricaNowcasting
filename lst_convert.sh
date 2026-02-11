@@ -200,8 +200,11 @@ for FFILE in "${FILES[@]}"
           # get rid of any erroneous leftover nans
           gdal_calc.py -A $newfile_pre --calc="(A<$large_value)*A + (A>$large_value)*-999" --outfile $newfile_pre --NoDataValue=-999
 
-          gdal_translate  -co compress=LZW $newfile_pre $newfile_ready
-          ls $wdir
+          #gdal_translate  -co compress=LZW $newfile_pre $newfile_ready
+          gdal_translate  -co compress=LZW -co TILED=YES -co BLOCKXSIZE=512 -co BLOCKYSIZE=512 -co PREDICTOR=2 $newfile_pre $newfile_ready
+          gdaladdo -r average $newfile_ready 2 4 8 16 32
+          
+          #ls $wdir
           cp -f $newfile_ready $newfile
 
           rm -f $newfile_ready
