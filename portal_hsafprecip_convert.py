@@ -261,8 +261,10 @@ def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',rep
     if doReproj:
         ds = gdal.Warp(reprojFile, rasFile2, srcSRS='EPSG:'+str(origEPSG), dstSRS='EPSG:'+str(newEPSG), format='GTiff',creationOptions=["COMPRESS=DEFLATE", "TILED=YES"])
         ds = None 
+    
     if trim:
         os.system('rm '+rasFile2)
+    os.system('gdaladdo -r average '+reprojFile+' 2 4 8 16 32')
     os.system('chmod a+rw '+reprojFile)
 
 
