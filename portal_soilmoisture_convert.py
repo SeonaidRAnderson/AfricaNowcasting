@@ -162,8 +162,10 @@ for root in all_files:
     rasFile = filename.split('.')[0]+'.tif'
     if args.domain == 'SSA_6k':
         reprojFile = filename.split('.')[0]+'_6k_'+str(newEPSG)+'.tif'
+        tilefile =filename.split('.')[0]+'_6k_'+str(newEPSG)+'_tiling.tif'
     else:
         reprojFile = filename.split('.')[0]+'_'+str(newEPSG)+'.tif'
+        tilefile = filename.split('.')[0]+'_'+str(newEPSG)+'_tiling.tif'
     print(outdir)
     if not os.path.exists(outdir):
         os.mkdir(outdir)
@@ -195,11 +197,15 @@ for root in all_files:
     rasImage.close()
     ds = gdal.Warp(reprojFile, rasFile, srcSRS='EPSG:'+str(origEPSG), dstSRS='EPSG:'+str(newEPSG), format='GTiff')
     ds = None  
-    print(reprojFile)
-
-    os.system('mv '+reprojFile+' '+outdir+'/'+reprojFile)
+    
+    # tiling
+    os.system('gdal_translate '+reprojFile+' '+tilefile+' '+'-of GTiff -co TILED=YES -co BLOCKXSIZE=512 -co BLOCKYSIZE=512 -co COMPRESS=DEFLATE')
+    # couldnt use predictor ERROR 1: PredictorSetup:Horizontal differencing "Predictor" not supported with 64-bit samples
+    os.system('gdaladdo -r average '+tilefile+' 2 4 8 16 32')
+    os.system('mv '+tilefile+' '+outdir+'/'+reprojFile)
 
     os.system('rm '+rasFile)
+    os.system('rm '+reprojFile)
     #os.system('mv '+rasFile+' '+outdir)
 
 
