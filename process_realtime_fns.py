@@ -3017,11 +3017,13 @@ def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',rep
         ds = gdal.Warp(reprojFile, rasFile2, srcSRS='EPSG:'+str(origEPSG), dstSRS='EPSG:'+str(newEPSG), format='GTiff',creationOptions=["COMPRESS=LZW"])
         ds = None  
 
+
     if rm_distort:
         print("distortions removed")
         rasFile_distort = reprojFile[:-4]+'_distort.tif'
         os.system('gdalwarp -cutline '+distortMask+' -crop_to_cutline -dstnodata -999 '+reprojFile+' '+rasFile_distort)
         os.system('mv '+rasFile_distort+' '+reprojFile)
+    os.system('gdaladdo -r average '+reprojFile+' 2 4 8 16 32')
 #gdalwarp -cutline ctt_cutout.shp -crop_to_cutline -dstnodata 0 Observed_CTT_202502100630_extended_3857.tif outtest3.tif
     
 
