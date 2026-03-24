@@ -20,6 +20,7 @@ indir="/mnt/prj/swift/SEVIRI_LST/lsta_ssa/nrt/"
 # default argument values
 mode="realtime"
 outdir="/mnt/HYDROLOGY_stewells/geotiff/lawis_lsta/"
+#outdir="/home/stewells/AfricaNowcasting/tmp/"
 startDate=""
 endDate=""
 reprocess="true"
@@ -167,8 +168,8 @@ for FFILE in "${FILES[@]}"
 
 #          echo "TRANSLATE"
           gdal_translate -of VRT $tmptif $tmpvrt
-          gdal_translate  -co compress=LZW -co TILED=YES -co BLOCKXSIZE=512 -co BLOCKYSIZE=512 -co PREDICTOR=2 $newfile_pre $newfile_ready
-          gdaladdo -r average $newfile_ready 2 4 8 16 32
+         # gdal_translate  -co compress=LZW -co TILED=YES -co BLOCKXSIZE=512 -co BLOCKYSIZE=512 -co PREDICTOR=2 $newfile_pre $newfile_ready
+          #gdaladdo -r average $newfile_ready 2 4 8 16 32
 
 
 
@@ -187,7 +188,7 @@ for FFILE in "${FILES[@]}"
           old_nodata_value='1.175494351e-38'
 
           if [ ! -f $newfile_pre ]; then
-               gdalwarp -of GTiff -co compress=lzw -geoloc -s_srs EPSG:4326 -t_srs EPSG:3857 -dstnodata "$new_nodata_value" $tmpvrt $newfile_pre
+               gdalwarp -of GTiff -co compress=lzw -geoloc -s_srs EPSG:4326 -t_srs EPSG:3857 -tr 3000 3000 -tap -dstnodata "$new_nodata_value" $tmpvrt $newfile_pre
           fi
           #tidy up
 
@@ -207,8 +208,8 @@ for FFILE in "${FILES[@]}"
           #ls $wdir
           cp -f $newfile_ready $newfile
 
-          rm -f $newfile_ready
-          rm -f $newfile_pre
+          #############rm -f $newfile_ready
+          #############rm -f $newfile_pre
           # rm tmp*.vrt
 
      else
