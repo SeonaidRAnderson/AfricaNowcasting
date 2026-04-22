@@ -27,10 +27,13 @@ import netCDF4 as nc
 # include Conni's ccores package
 sys.path.append('/mnt/users/hymod/seodey/NFLICS/')
 import ccores.cores as cores
+
+#code_dir="/home/stewells/AfricaNowcasting/rt_code/"
+code_dir="/mnt/users/hymod/seodey/NFLICS/AfricaNowcasting/"
 ##################################################
 # Main function to create the nowcasts
 ###############################################
-def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_base,rt_code_input,feed,db_version):
+def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_base,rt_code_input,archiveDir,lawisDirs,options):
     processClock= time.time()
     
 	
@@ -57,17 +60,17 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
             do_risk_subdomain[idomain] = True
 		
 		
-    do_extended_core_calcs=False
-    do_lst_adjustments =False
-    do_shared_plots=True
-    do_point_timeseries = True
-    do_geotiff = True
-    output_site_cores=True
+    do_extended_core_calcs=options["do_extended_core_calcs"]
+    do_lst_adjustments =options["do_lst_adjustments"]
+    do_shared_plots=options["do_shared_plots"]
+    do_point_timeseries = options["do_point_timeseries"]
+    do_geotiff = options["do_geotiff"]#Needs to be true to output the timeseris
+    output_site_cores=options["output_site_cores"]
 
    # OPTIMISATION OPTIONS
-    opt_geotiff = True
-    opt_geotiff_float32=True
-    opt_geotiff_ndpls = 2
+    opt_geotiff = options["opt_geotiff"]
+    opt_geotiff_float32=options["opt_geotiff_float32"]
+    opt_geotiff_ndpls = options["opt_geotiff_ndpls"]
 
 	
    # version_maj = Main product version
@@ -144,7 +147,6 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     mask_dir= {}
     mask_dir['sadc'] = '/mnt/prj/NC_Int_CCAd/3C/seodey/data/historical_database/Counts_2004to2019_'
     mask_dir['wa'] = '/mnt/prj/NC_Int_CCAd/3C/seodey/data/historical_database/WCA/Counts_2004to2019_'
-    archiveDir= '/mnt/prj/nflics/rt_cores/'
     
    # datadir['sadc'] ="/prj/nflics/historical_database/date_split_SADC_v2_realtime/msg9_cell_shape_wave_rect_20041101to20191130_SADC_v2/msg9_cell_shape_wave_rect_"
    # datadir['wa'] =  "/prj/nflics/historical_database/date_split_WA_v2_realtime/msg9_cell_shape_wave_rect_20040601to20190930_WA_v2/msg9_cell_shape_wave_rect_"
@@ -175,7 +177,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         # also combine the site names
         pt_locn_names_full+=pt_locn_names[dom]
         pt_locn_locs_full+=pt_locn_locs[dom]
-    geotiff_outpath = get_portal_outpath('CTT',tnow,viaS = True)
+    
+    geotiff_outpath = get_portal_outpath('CTT',tnow,lawisDirs,viaS = True)
     #geotiff_outpath = '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data'
     #geotiff_outpath = '/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/ssa_test_feed'
     #geotiff_outpath = '/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/tmp'
@@ -236,7 +239,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         t_searches = [60*isearch for isearch in tsearch_irr]
     else:
         t_searches=list(range(0,(n_search+1)*(search_freq),search_freq))
-    if feed=="historical":
+    if options["feed"]=="historical":
 		
         latlons = get_dummy_ssa_latlon()
         rt_lats=latlons[0]
@@ -274,8 +277,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 			   
         data_all=data_all[grid_lims_rt[0]:grid_lims_rt[2],grid_lims_rt[1]:grid_lims_rt[3]][:-1,]
 
-    elif feed=="eumdat":
-        rt_file=rt_dir+"/IR_108_BT_"+tnow[:8]+"_"+tnow[-4:]+".nc"
+    elif options["feed"]=="eumdat":
+        rt_file=rt_dir+"/IR_108_BT_"+tnow[:8]+"_"+tnow[-4:]+"_eumdat.nc" ##sra 2026
 
         rt_lats,rt_lons,data_all=get_rt_data(rt_file,ftype='ir108_bt',haslatlon=False)
 
@@ -356,7 +359,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 
 
     missing=[np.all(np.isnan(grid)) for grid in data_all]
-    
+    print(len(missing))
     #-------------------------------------------------------------------------------
     # Regrid and Calculate the core information
     #-------------------------------------------------------------------------------
@@ -414,59 +417,59 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 
 
 # weights for the full domain 
-    if os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_data_ex.npz'):
+    if os.path.exists(code_dir+'weights_data_ex.npz'):
         print("reading npz weights")
-        weightdata = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_data_ex.npz')
-        inds = weightdata['inds_ex']
-        weights= weightdata['weights_ex']
-        new_shape=tuple(weightdata['new_shape_ex'])
+        weightdata = np.load(code_dir+'weights_data_ex.npz')
+        inds = weightdata['inds'] 
+        weights= weightdata['weights'] #SRA removed _ex to match file creation above
+        new_shape=tuple(weightdata['new_shape'])
                            
     else: # need to make it   
         print("creating weights")
         inds, weights, new_shape=uinterp.interpolation_weights(lons_mid[np.isfinite(lons_mid)], lats_mid[np.isfinite(lats_mid)],blobs_lons, blobs_lats, irregular_1d=True)
-        np.savez('/home/stewells/AfricaNowcasting/rt_code/weights_data_ex.npz',inds_ex=inds,weights=weights,new_shape=np.array(new_shape))
+        np.savez(code_dir+'weights_data_ex.npz',inds=inds,weights=weights,new_shape=np.array(new_shape))
 
    # print(os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz'))
 # return journey...
-    if os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz'):
+    if os.path.exists(code_dir+'weights_2_data_ex_a.npz'):
         #print(
         print("reading npz weights 2")
-        weight2data = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz')
+        weight2data = np.load(code_dir+'weights_2_data_ex_a.npz')
         inds_2 = weight2data['inds_2_ex']
-        weights_2= weight2data['weights_2_ex']
-        new_shape_2=tuple(weight2data['new_shape_2_ex'])
+        weights_2= weight2data['weights_2']
+        new_shape_2=tuple(weight2data['new_shape_2'])
                            
     else: # need to make it   
         print("creating weights 2")
         inds_2, weights_2, new_shape_2=uinterp.interpolation_weights(blobs_lons[np.isfinite(blobs_lons)], blobs_lats[np.isfinite(blobs_lats)], lons_mid, lats_mid)
-        np.savez('/home/stewells/AfricaNowcasting/rt_code/weights_2_data_ex_a.npz',inds_2_ex=inds_2,weights_2_ex=weights_2,new_shape_2_ex=np.array(new_shape_2))
+        np.savez(code_dir+'weights_2_data_ex_a.npz',inds_2_ex=inds_2,weights_2=weights_2,new_shape_2=np.array(new_shape_2))
 			
 			
     # visual radiation only need one-way to project onto constant pixel grid
-    if os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_ssa_3km.npz'):
+    if os.path.exists(code_dir+'weights_ssa_3km.npz'):
         print("reading npz 3km weights")
-        weightdata3km = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_ssa_3km.npz')
+        weightdata3km = np.load(code_dir+'weights_ssa_3km.npz')
         inds_3km = weightdata3km['inds_3km']
         weights_3km = weightdata3km['weights_3km']
         new_shape_3km = tuple(weightdata3km['new_shape_3km'])
     else: #nned to make it
         print("creating weights 3km")
         inds_3km, weights_3km, new_shape_3km=uinterp.interpolation_weights( lons_mid, lats_mid,blobs_lons_3km, blobs_lats_3km)
-        np.savez('/home/stewells/AfricaNowcasting/rt_code/weights_ssa_3km.npz',inds_3km=inds_3km,weights_3km=weights_3km,new_shape_3km=np.array(new_shape_3km))
+        np.savez(code_dir+'weights_ssa_3km.npz',inds_3km=inds_3km,weights_3km=weights_3km,new_shape_3km=np.array(new_shape_3km))
 
 # weights for the subdomain (only need in one direction for geotiff conversion)
     weightdata_sub, inds_sub, weights_sub, new_shape_sub = {},{},{},{}
 
     for dom in do_full_nowcast:
-        if os.path.exists('/home/stewells/AfricaNowcasting/rt_code/weights_'+dom+'_v2.npz'):
-            weightdata_sub = np.load('/home/stewells/AfricaNowcasting/rt_code/weights_'+dom+'_v2.npz')
+        if os.path.exists(code_dir+'weights_'+dom+'_v2.npz'):
+            weightdata_sub = np.load(code_dir+'weights_'+dom+'_v2.npz')
             inds_sub[dom] = weightdata_sub['inds']
             weights_sub[dom]= weightdata_sub['weights']
             new_shape_sub[dom]=tuple(weightdata_sub['new_shape'])      
         else: # need to make it
             print("creating weights for subdomain "+dom)
             inds_sub[dom], weights_sub[dom], new_shape_sub[dom]=uinterp.interpolation_weights(lons_mid_sub[dom][np.isfinite(lons_mid_sub[dom])], lats_mid_sub[dom][np.isfinite(lats_mid_sub[dom])],blobs_lons_sub[dom], blobs_lats_sub[dom], irregular_1d=True)
-            np.savez('/home/stewells/AfricaNowcasting/rt_code/weights_'+dom+'_v2.npz',inds=inds_sub[dom],weights=weights_sub[dom],new_shape=np.array(new_shape_sub[dom]))
+            np.savez(code_dir+'weights_'+dom+'_v2.npz',inds=inds_sub[dom],weights=weights_sub[dom],new_shape=np.array(new_shape_sub[dom]))
     
     #identify convectiv structures for real time image
     ###inds, weights, new_shape=uinterp.interpolation_weights( lons_mid, lats_mid,blobs_lons, blobs_lats)
@@ -476,14 +479,16 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     #print(lons_mid.shape)
     #need to interpolate the dadta to a constant resolution 5km grid for the wavelet code
     data_all_keep=np.copy(data_all)
-    #print(data_all.shape)
+    print(data_all.shape)
     blobs_interp = []
-    #print(use_times)
+    print(use_times)
     new_method=True
     if new_method:
         #print(use_times[:1])
         for i_time,date in enumerate(use_times[:1]):
-            wObj = cores.dataset('METEOSAT3K_veraLS')                                   # initialises the 3km scale decomposition and defines scale range
+            wObj = cores.dataset('METEOSAT3K_veraLS') 
+            print(np.unique(data_all))
+            # initialises the 3km scale decomposition and defines scale range
             wObj.read_img(np.copy(data_all[:,:]), lons_mid, lats_mid, edge_smoothing=False)   # Prepares data image for wavelets. Input here: Native MSG data and native lat/lon coordinates (irregular 2d!)        
             wObj.applyWavelet(normed='scale')
             try:
@@ -573,11 +578,11 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
        # plt.show()
         
         #rasPath = geotiff_outpath+"/Observed_CTT_"+tnow+"_extended.tif"
-        rasPath = get_portal_outpath('CTT',tnow)+"/Observed_CTT_"+tnow+"_extended.tif"
+        rasPath = get_portal_outpath('CTT',tnow,lawisDirs)+"/Observed_CTT_"+tnow+"_extended.tif"
 
 
         #rasPath_3857 = geotiff_outpath+"/Observed_CTT_"+tnow+"_extended_3857.tif"
-        rasPath_3857 = get_portal_outpath('CTT',tnow)+"/Observed_CTT_"+tnow+"_extended_3857.tif"
+        rasPath_3857 = get_portal_outpath('CTT',tnow,lawisDirs)+"/Observed_CTT_"+tnow+"_extended_3857.tif"
 
         data_interp = uinterp.interpolate_data(data_all_keep, inds, weights, new_shape) # interpolate onto constant grid for geotiff
 
@@ -596,8 +601,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
             
             #rasPath= geotiff_outpath+"/ch1_X_"+tnow+"_pc.tif"
             #rasPath_3857= geotiff_outpath+"/ch1_X_"+tnow+"_pc_3857.tif"
-            rasPath= get_portal_outpath('Vis',tnow)+"/ch1_X_"+tnow+"_pc.tif"
-            rasPath_3857= get_portal_outpath('Vis',tnow)+"/ch1_X_"+tnow+"_pc_3857.tif"
+            rasPath= get_portal_outpath('Vis',tnow,lawisDirs)+"/ch1_X_"+tnow+"_pc.tif"
+            rasPath_3857= get_portal_outpath('Vis',tnow,lawisDirs)+"/ch1_X_"+tnow+"_pc_3857.tif"
 
             data_interp_vis=uinterp.interpolate_data(data_all_vis, inds_3km, weights_3km, new_shape_3km)
 # getting some weird neagitves here so crop them
@@ -617,8 +622,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         # 3. Convective structures
         #rasPath = geotiff_outpath+"/Observed_ConStruct_"+tnow+"_extended.tif"
         #rasPath_3857 = geotiff_outpath+"/Observed_ConStruct_"+tnow+"_extended_3857.tif"
-        rasPath = get_portal_outpath('ConStruct',tnow)+"/Observed_ConStruct_"+tnow+"_extended.tif"
-        rasPath_3857 = get_portal_outpath('ConStruct',tnow)+"/Observed_ConStruct_"+tnow+"_extended_3857.tif"
+        rasPath = get_portal_outpath('ConStruct',tnow,lawisDirs)+"/Observed_ConStruct_"+tnow+"_extended.tif"
+        rasPath_3857 = get_portal_outpath('ConStruct',tnow,lawisDirs)+"/Observed_ConStruct_"+tnow+"_extended_3857.tif"
 # interpolate to 5km here
         blobmask_interp = uinterp.interpolate_data(blobmask, inds, weights, new_shape) 
 	
@@ -693,8 +698,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         #get_portal_outpath('ConStruct',tnow)
         #rasPath = geotiff_outpath+"/PastCores_"+tnow+".tif"
         #rasPath_3857 = geotiff_outpath+"/PastCores_"+tnow+"_3857.tif"
-        rasPath = get_portal_outpath('PastCores',tnow)+"/PastCores_"+tnow+".tif"
-        rasPath_3857 = get_portal_outpath('PastCores',tnow)+"/PastCores_"+tnow+"_3857.tif"
+        rasPath = get_portal_outpath('PastCores',tnow,lawisDirs)+"/PastCores_"+tnow+".tif"
+        rasPath_3857 = get_portal_outpath('PastCores',tnow,lawisDirs)+"/PastCores_"+tnow+"_3857.tif"
         #print("PASTCORES")
         #print(rasPath_3857)
         make_geoTiff([allPastCores],rasPath,reprojFile=rasPath_3857,extended=True,v_maj=version_maj['full'],v_min=version_min['full'],v_submin=version_submin['full'],trim=True)    
@@ -1011,9 +1016,10 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
             #print(com_lat.data)
             #print(com_lon.data)
             for lat_loc,lon_loc in zip(com_lat.data,com_lon.data):        
-            #print(i,lat_loc,lon_loc)
+                print(i,lat_loc,lon_loc)
                 if ((lat_loc not in lats_mid_sub[domain]) or (lon_loc not in lons_mid_sub[domain])):
                 #if ((lat_loc < plot_area_sub[domain][0]) or (lat_loc > plot_area_sub[domain][2]) or (lon_loc <  plot_area_sub[domain][1]) or (lon_loc > plot_area_sub[domain][3])):
+                    print("location outside of subdomain ", domain)
                     continue
                 #print([lon_loc,lat_loc])
                 #print(np.where((lats_mid_sub[domain]==lat_loc) & (lons_mid_sub[domain]==lon_loc))[1])
@@ -1021,9 +1027,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                 #print(np.where(lons_mid_sub[domain]==lon_loc))	
                 #print([np.nanmax(lons_mid_sub[domain])])			
             # lats_mid etc need to be the SUBDOMAIN ONES
-
-                com_loc[1][i,]=np.where((lats_mid_sub[domain]==lat_loc) & (lons_mid_sub[domain]==lon_loc))[1]
-                com_loc[0][i,]=np.where((lats_mid_sub[domain]==lat_loc) & (lons_mid_sub[domain]==lon_loc))[0]
+                com_loc[1][i,]=np.where((lats_mid_sub[domain]==lat_loc) & (lons_mid_sub[domain]==lon_loc))[1][0]  #SRA 042026 added[0] to get it to run
+                com_loc[0][i,]=np.where((lats_mid_sub[domain]==lat_loc) & (lons_mid_sub[domain]==lon_loc))[0][0]
                 i=i+1
         
 		    # (re)definition of com_loc for the specific domain 
@@ -1254,9 +1259,9 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 
                         #rasPath = geotiff_outpath+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
                         #rasPath_3857 = geotiff_outpath+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
-                        rasPath = get_portal_outpath('Nowcast',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
-                        rasPath_3857 = get_portal_outpath('Nowcast',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
-
+                        rasPath = get_portal_outpath('Nowcast',tnow,lawisDirs)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
+                        rasPath_3857 = get_portal_outpath('Nowcast',tnow,lawisDirs)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
+                        print("rasPaths:",rasPath, rasPath_3857)
 
                         if  opt_geotiff:                  
                             if opt_geotiff_float32:
@@ -1265,7 +1270,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                                 dat_rect_geotiff_interp_grid = np.round(dat_rect_geotiff_interp_grid,opt_geotiff_ndpls)
 
 
-
+                        print("making nowcast geotiff")
                         make_geoTiff([dat_rect_geotiff_interp_grid],rasPath,reprojFile=rasPath_3857,doReproj=False,is_nowcast=True,subdomain=domain,v_maj=version_maj[domain],v_min=version_min[domain],v_submin=version_submin[domain])
                         if do_point_timeseries and len(pt_locn_names[domain])>0:
                             for iloc in range(len(pt_locn_names[domain])):
@@ -1328,21 +1333,23 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                 enc = {var: comp for var in ds_nc.data_vars}
                 ds_nc.to_netcdf(path=plotdir+"/Nowcast_"+tnow+"_000"+dom_suffix[domain]+".nc",mode='w', encoding=enc, format='NETCDF4')
 			
-
+                print("ts:",dat_rect_fixed_pt_ts)
+                print("pt_locn_names[domain]:",pt_locn_names[domain])
                 if do_geotiff and do_point_timeseries and len(pt_locn_names[domain])>0:
                     writeType='w' if first_pt_ts[1] else 'a'
 
                    # pointplot_csvfile_fixed_grid=geotiff_outpath+"/Nowcast_timeseries_v"+str(nflics_output_version_portal)+"_"+tnow+".csv"
-                    pointplot_csvfile_fixed_grid=get_portal_outpath('Nowcast_ts',tnow)+"/Nowcast_timeseries_v"+str(nflics_output_version_portal)+"_"+tnow+".csv"
+                    pointplot_csvfile_fixed_grid=get_portal_outpath('Nowcast_ts',tnow,lawisDirs)+"/Nowcast_timeseries_v"+str(nflics_output_version_portal)+"_"+tnow+".csv"
 
                     plt_nflics_ts(str(use_times[0])[:-9]+' '+tnow[-4:]+" UTC",dat_rect_fixed_pt_ts,pt_locn_names[domain],pt_locn_locs[domain],pointplot_tsfile,pointplot_csvfile_fixed_grid,pt_ts_filters,nhrs=9,fixed=True)
                     first_pt_ts[1] = False
 			
-                if do_point_timeseries and len(pt_locn_names[domain])>0:
-                    writeType='w' if first_pt_ts[0] else 'a'
-                    #plt_nflics_ts(str(use_times[0])[:-9]+' '+tnow[-4:]+" UTC",dat_rect_pt_ts,pt_locn_names,pt_locn_locs,pointplot_tsfile,pointplot_csvfile,pt_ts_filters)
-                    plt_nflics_ts(str(use_times[0])[:-9]+' '+tnow[-4:]+" UTC",dat_rect_fixed_pt_ts,pt_locn_names[domain],pt_locn_locs[domain],pointplot_tsfile,pointplot_csvfile,pt_ts_filters,nhrs=9)
-                    first_pt_ts[0] = False
+                #SRA commented this out as the timeseries DON'T WORK unless do_geotiff is set
+              #  if do_point_timeseries and len(pt_locn_names[domain])>0:
+              #      writeType='w' if first_pt_ts[0] else 'a'
+              #      #plt_nflics_ts(str(use_times[0])[:-9]+' '+tnow[-4:]+" UTC",dat_rect_pt_ts,pt_locn_names,pt_locn_locs,pointplot_tsfile,pointplot_csvfile,pt_ts_filters)
+              #      plt_nflics_ts(str(use_times[0])[:-9]+' '+tnow[-4:]+" UTC",dat_rect_fixed_pt_ts,pt_locn_names[domain],pt_locn_locs[domain],pointplot_tsfile,pointplot_csvfile,pt_ts_filters,nhrs=9)
+              #      first_pt_ts[0] = False
             #if do_geotiff:
             #    os.system('cp '+pointplot_csvfile+' '+geotiff_outpath)
             #-------------------------------------------------------------------------------
@@ -1381,8 +1388,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                 try:
                     dummy_arr = np.ones((2,2))*-9999
                     for use_time,i_search in zip(use_times,t_searches):  
-                        rasPath = get_portal_outpath('Nowcast',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
-                        rasPath_3857 = get_portal_outpath('Nowcast',tnow)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
+                        rasPath = get_portal_outpath('Nowcast',tnow,lawisDirs)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+dom_suffix[domain]+".tif"
+                        rasPath_3857 = get_portal_outpath('Nowcast',tnow,lawisDirs)+"/Nowcast_"+tnow+"_"+str(i_search).zfill(3)+"_3857"+dom_suffix[domain]+".tif"
                         make_geoTiff([dummy_arr],rasPath,reprojFile=rasPath_3857,doReproj=False,is_nowcast=True,subdomain=domain,v_maj=version_maj[domain],v_min=version_min[domain],v_submin=version_submin[domain])
                 except Exception as e:
                     print(e)  
@@ -1498,7 +1505,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 
                 outpath=plotdir+"/Risk_nowcast_v"+str(nflics_output_version[domain])+"_"+tnow+"_000.csv"  #DO NOT CHANGE - HARD CODED IN GUI
                # outpath2 = geotiff_outpath+"/Risk_nowcast_v"+str(nflics_output_version_portal)+"_"+tnow+"_000.csv"
-                outpath2 = get_portal_outpath('Risk',tnow)+"/Risk_nowcast_v"+str(nflics_output_version_portal)+"_"+tnow+"_000.csv"
+                outpath2 = get_portal_outpath('Risk',tnow,lawisDirs)+"/Risk_nowcast_v"+str(nflics_output_version_portal)+"_"+tnow+"_000.csv"
 
                 #outpath="/prj/nflics/RT_code_v2_input/test_out.csv"
                 pd.DataFrame(toout).to_csv(outpath,index=False)
@@ -2908,11 +2915,15 @@ def plt_nflics_ts(forigin,ts,places,locs,plotfile,csvfile,filters,nhrs=6,fixed=F
 
     # 2 plot it 
     # hours (hard coded to 6)
-    t = np.arange(nhrs+1)  
+    t = np.arange(nhrs+1)
+    print("t:",t)
+    print("ts[:]:",ts)
+       
     if not fixed:  # only plot for varibale pixel (ie database, not portal)
         ForcOrigin = forigin
         nlocations = len(places)
         for iax in range(nlocations):
+            print("iax:",iax)
             ax = plt.subplot(nlocations,1,1+iax)
             plt.plot(t, ts[iax])
             plt.setp(ax.get_xticklabels(), fontsize=6)
@@ -3023,7 +3034,12 @@ def make_geoTiff(data,rasFile,doReproj = True,origEPSG='4326',newEPSG='3857',rep
         rasFile_distort = reprojFile[:-4]+'_distort.tif'
         os.system('gdalwarp -cutline '+distortMask+' -crop_to_cutline -dstnodata -999 '+reprojFile+' '+rasFile_distort)
         os.system('mv '+rasFile_distort+' '+reprojFile)
-    os.system('gdaladdo -r average '+reprojFile+' 2 4 8 16 32')
+    
+    
+    addofile = reprojFile if doReproj else rasFile2
+    os.system('gdaladdo -r average '+addofile+' 2 4 8 16 32')
+    
+    #os.system('gdaladdo -r average '+reprojFile+' 2 4 8 16 32')
 #gdalwarp -cutline ctt_cutout.shp -crop_to_cutline -dstnodata 0 Observed_CTT_202502100630_extended_3857.tif outtest3.tif
     
 
@@ -3112,12 +3128,26 @@ def rect_rt_loop(dat_rect,use_rect,datadir,i_search,load_time,filters_real_time,
     return(dat_rect_max,missing_database_vec_t,poly_val_freq)
 
 
-def get_portal_outpath(datatype,tnow,viaS = False):
+def get_portal_outpath(datatype,tnow,lawisDirs,viaS = False):
+    if lawisDirs["lawisOffline"]:  #SRA 04/26 added offline option. Send everything here offline!
+        tstring = tnow[:8]
+        outRoot = lawisDirs['offlineDir']
+        outDirs = {'Nowcast':os.path.join(outRoot,'geotiff','lawis_nowcast',tstring),
+                   'CTT':os.path.join(outRoot,'geotiff','lawis_ctt',tstring),
+                   'ConStruct':os.path.join(outRoot,'geotiff','lawis_construct',tstring),
+                   'PastCores':os.path.join(outRoot,'geotiff','lawis_past_cores',tstring),
+                   'Vis':os.path.join(outRoot,'geotiff','lawis_visible_channel',tstring),
+                   'Nowcast_ts':os.path.join(outRoot,'lawis-west-africa','nflics_nowcast',tstring),
+                   'Risk':os.path.join(outRoot,'lawis-west-africa','nflics_nowcast',tstring)}
+        if not os.path.exists(outDirs[datatype]):
+            os.makedirs(outDirs[datatype])
+        return outDirs[datatype]
+        
     if viaS:
-        return '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data'
-    
+        return lawisDirs["viaSDir"]
+        
     tstring = tnow[:8]
-    outRoot = '/mnt/HYDROLOGY_stewells/'
+    outRoot = lawisDirs["mntDir"]
     outDirs = {'Nowcast':os.path.join(outRoot,'geotiff','lawis_nowcast',tstring),
 	           'CTT':os.path.join(outRoot,'geotiff','lawis_ctt',tstring),
 			   'ConStruct':os.path.join(outRoot,'geotiff','lawis_construct',tstring),
