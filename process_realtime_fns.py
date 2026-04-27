@@ -1,3 +1,8 @@
+
+#27/04/2026 SRA added function get_grid_from_ll to replace the point-location wrt grid calculations
+#           SRA edited the point locations to be read in from a point location file
+#           SRA edited point locations to be saved in a dictionary (keys=names, data=[lat,lon])
+
 import numpy as np
 import numpy.ma as ma
 import matplotlib as mpl
@@ -154,11 +159,15 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     #datadir['sadc'] ="/prj/NC_Int_CCAd/3C/seodey/data/historical_database/msg9_cell_shape_wave_rect_20040201to20190228_SADC_v2/msg9_cell_shape_wave_rect_"
       #  datadir['sadc'] +=["/prj/NC_Int_CCAd/3C/seodey/data/historical_database/msg9_cell_shape_wave_rect_"+dstring+"_SADC_v2/msg9_cell_shape_wave_rect_"]
     # point timeseries Info
-    pt_locn_names,pt_locn_locs = {},{}
-    pt_locn_names['wa'] = ['Dakar','Matam','Tambacounda','Ziguinchor','Kaolack','Iles de Saloum']
-    pt_locn_locs['wa'] = [[14.734,-17.468],[15.658,-13.256],[13.773,-13.667],[12.577,-16.272],[14.160,-16.07],[13.663,-16.642]]  #[lat,lom]
-    pt_locn_names['sadc'] = ['Chisamba_Chipembi', 'Kabwe_Mulungushi Univ', 'Chisamba_Gart farm', 'Mufulira_Kafironda', 'Kafulafuta_Police yard', 'Kitwe_University Cumpas', 'Katete_Katete FTC', 'Chama_Chama Ftc', 'Katete_Agric Camp', 'Lusaka_Unza', 'chongwe_KKIA', 'Luangwa_Kaunga', 'Lusaka_Unza Agric', 'Chiengi_Chiengi school', 'Milenge_Milenge', 'Nakonde_Mwenzo school', 'Mafinga_Ntendele school', 'Luwingu_school Sec School', 'Chilubi Island_Chilubi school', 'Mpulungu_Mpulungu school', 'Nsenga Hill_school', 'Kabompo_Met Yard', 'Mwinilunga_Met office', 'Kalumbila_mine site', 'Maamba_mine office', 'Gwembe_Muyunbwe', 'Chirundu_Lusitu FTC', 'Monze_kanchomba Ftc', 'Kazungula_Nyawa', 'Kaoma_Met office', 'Lukulu_Council office', 'Mulobezi_Sichili school', 'Sesheke_Met office', 'Kalabo_Met office', 'Mongu_Kataba']
-    pt_locn_locs['sadc'] = [[-14.928, 28.576], [-14.291, 28.567], [-14.94656, 28.08952], [-12.613, 28.179], [-13.31669, 28.75317], [-12.774, 28.207], [-14.083, 32.061], [-11.24, 33.155], [-14.1046, 31.9201], [-15.391, 28.332], [-15.319, 28.44], [-15.61973, 30.40192], [-15.39463, 28.33722], [-8.653, 29.164], [-12.123, 29.69], [-9.333, 32.755], [-10.263, 33.374], [-10.252, 29.906], [-10.769, 30.282], [-8.773, 31.117], [-9.36441, 31.24967], [-13.596, 24.208], [-11.74, 24.431], [-12.26875, 25.3051], [-17.34, 27.187], [-16.629, 27.772], [-16.1454, 26.7912], [-16.594, 27.494], [-17.19152, 25.89093], [-14.798, 24.804], [-14.342, 23.244], [-16.712, 24.952], [-17.477, 24.301], [-14.989, 22.682], [-15.445, 23.351]]
+       
+    pt_locns={}
+    for dom in ['wa','sadc']:
+        loc_dat=pd.read_csv("/mnt/prj/nflics/geoloc_grids/point_loc/point_loc_"+dom+"_v1.csv",index_col="name")
+        pt_locns[dom]=dict(zip(loc_dat.index.to_list(),loc_dat.to_numpy()))
+
+    #save the locations 
+    #pd.DataFrame(pt_locn_locs['sadc'],columns=["lat","lon"],index=pt_locn_names['sadc']).to_csv("/mnt/prj/nflics/geoloc_grids/point_loc/point_loc_sadc_v1.csv",index=True,index_label="name")
+    #pd.DataFrame(pt_locn_locs['wa'],columns=["lat","lon"],index=pt_locn_names['wa']).to_csv("/mnt/prj/nflics/geoloc_grids/point_loc/point_loc_wa_v1.csv",index=True,index_label="name")
     
     # Define Nflics output version by db_version argument  1 = extended cores ON, version-dependent plots ON, shared plots ON, suffix 'v1', 
     #                               2 = extended cores OFF, version-dependednt (inc LST) plots ON, shared plots OFF, suffix 'v2'
@@ -166,18 +175,21 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 	
 	# subdomain geoloc file
     geoloc_sub_file = {}
-    pt_locn_names_full,pt_locn_locs_full = [],[]
+    pt_locns_full={}
+    #pt_locn_names_full,pt_locn_locs_full = [],[]
     squares_file= {}
+
     for dom in do_full_nowcast:
         sqDom = dom
         if dom =='wa':
             sqDom = 'wca'
-
+            
         squares_file[dom] = nflics_base+"/geoloc_grids/msg_rect_ALLhr_ninner"+str(n_inner)+'_'+sqDom+'.nc'
         # also combine the site names
-        pt_locn_names_full+=pt_locn_names[dom]
-        pt_locn_locs_full+=pt_locn_locs[dom]
-    
+        #pt_locn_names_full+=pt_locn_names[dom]
+        #pt_locn_locs_full+=pt_locn_locs[dom]
+        pt_locns_full=pt_locns_full|pt_locns[dom]
+        
     geotiff_outpath = get_portal_outpath('CTT',tnow,lawisDirs,viaS = True)
     #geotiff_outpath = '/mnt/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/data'
     #geotiff_outpath = '/data/hmf/projects/LAWIS/WestAfrica_portal/SANS_transfer/ssa_test_feed'
@@ -381,7 +393,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     lons_mid_sub, lats_mid_sub,blobs_lons_sub, blobs_lats_sub = {},{},{},{}
     lons_edge_sub, lats_edge_sub = {},{}
     pt_locn_locs_rc	, pt_locn_locs_rc_fixed = {},{}	
-    pt_locn_locs_rc_full,pt_locn_locs_rc_full_fixed = [],[]
+    pt_locn_locs_rc_full,pt_locn_locs_rc_full_fixed = {},{}
 	#for dom in list(do_full_nowcast.keys()):
     for dom in do_full_nowcast:        
         lons_mid_sub[dom] = np.array(geoloc_sub_file[dom]['lons_mid'][...])
@@ -402,18 +414,15 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         blobs_lons_sub[dom][np.isnan(blobs_lons_sub[dom])] = -999
 
         # get poiunt locations in terms of rows and columns OF THE SUBDOMAIN THEY APPLY TO
-        pt_locn_locs_rc[dom] = [[(np.abs(lats_mid_sub[dom][:,0]-pt_locn_locs[dom][iloc][0])).argmin(),\
-                        (np.abs(lons_mid_sub[dom][0,:]-pt_locn_locs[dom][iloc][1])).argmin()] for iloc in range(len(pt_locn_names[dom]))]
-	    # get point locations in terms of rows and columns of fixed grid array
-        pt_locn_locs_rc_fixed[dom] = [[(np.abs(blobs_lats_sub[dom][:]-pt_locn_locs[dom][iloc][0])).argmin(),\
-                        (np.abs(blobs_lons_sub[dom][:]-pt_locn_locs[dom][iloc][1])).argmin()] for iloc in range(len(pt_locn_names[dom]))]					
-
-        # full domain
-    pt_locn_locs_rc_full += [[(np.abs(lats_mid[:,0]-pt_locn_locs_full[iloc][0])).argmin(),\
-                        (np.abs(lons_mid[0,:]-pt_locn_locs_full[iloc][1])).argmin()] for iloc in range(len(pt_locn_names_full))]
-	    # get point locations in terms of rows and columns of fixed grid array
-    pt_locn_locs_rc_full_fixed += [[(np.abs(blobs_lats[:]-pt_locn_locs_full[iloc][0])).argmin(),\
-                        (np.abs(blobs_lons[:]-pt_locn_locs_full[iloc][1])).argmin()] for iloc in range(len(pt_locn_names_full))]	
+        pt_locn_locs_rc[dom]=get_grid_from_ll(lats_mid_sub[dom][:,0], lons_mid_sub[dom][0,:], pt_locns[dom])                   
+        # get point locations in terms of rows and columns of fixed grid array
+        pt_locn_locs_rc_fixed[dom] = get_grid_from_ll(blobs_lats_sub[dom][:], blobs_lons_sub[dom][:], pt_locns[dom])
+        
+      
+     # full domain (non-fixed, used for archive plotting only, NOT PORTAL)
+    pt_locn_locs_rc_full= get_grid_from_ll(lats_mid[:,0], lons_mid[0,:], pt_locns_full)
+   	# get point locations in terms of rows and columns of fixed grid array (NEEDED FOR PORTAL)
+    pt_locn_locs_rc_full_fixed=get_grid_from_ll(blobs_lats[:], blobs_lons[:],pt_locns_full )
 
 
 # weights for the full domain 
@@ -630,10 +639,10 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
         if output_site_cores:
     # ASSUMES NEW METHOD WITH BLOBS ON NATIVE GRID
             isblobList = []
-            for iloc in range(len(pt_locn_names_full)):
+            for iloc in range(len(pt_locns_full.keys())):
                 isblobList+=[np.ceil(blobmask_interp[pt_locn_locs_rc_full_fixed[iloc][0],pt_locn_locs_rc_full_fixed[iloc][1]])]
             site_core_csv = plotdir+"/Site_cores_"+tnow+".csv"
-            write_site_cores(site_core_csv,pt_locn_names_full,pt_locn_locs_full,isblobList)
+            write_site_cores(site_core_csv,pt_locns_full.keys(),pt_locns_full,isblobList)
               
         sx = ndimage.sobel(blobmask_interp, axis=0, mode='constant')
         sy = ndimage.sobel(blobmask_interp, axis=1, mode='constant')
@@ -1088,8 +1097,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
             
                 dat_rect_t=[]
                 dat_poly_t=[]
-                dat_rect_pt_ts = [[] for x in range(len(pt_locn_names[domain]))] # 6 locations 
-                dat_rect_fixed_pt_ts = [[] for x in range(len(pt_locn_names[domain]))] # 6 locations on fixed pixel grid
+                dat_rect_pt_ts = [[] for x in range(len(pt_locns[domain].keys()))] # 6 locations 
+                dat_rect_fixed_pt_ts = [[] for x in range(len(pt_locns[domain].keys()))] # 6 locations on fixed pixel grid
                 pt_ts_filters = []
                 dat_rect_max_comb =[]
                 #print([use_times,t_searches])		
@@ -1242,7 +1251,7 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
                 #dat_rect[0,:,:][dat_rect[0,:,:]>100] = 100.    
                     # END OF LSTA IF
                     dat_rect_max[:,:][dat_rect_max[:,:]>100] = 100.    
-                    for iloc in range(len(pt_locn_names[domain])):
+                    for iloc in range(len(pt_locns[domain].keys())):
                         dat_rect_pt_ts[iloc].append(dat_rect_max[pt_locn_locs_rc[domain][iloc][0],pt_locn_locs_rc[domain][iloc][1]])
                     pt_ts_filters.append((filters_real_time[domain][int(i_search/60)]*5/(2*3))-1) 
                     dat_rect_max_comb.append(dat_rect_max)
@@ -1272,8 +1281,8 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
 
                         print("making nowcast geotiff")
                         make_geoTiff([dat_rect_geotiff_interp_grid],rasPath,reprojFile=rasPath_3857,doReproj=False,is_nowcast=True,subdomain=domain,v_maj=version_maj[domain],v_min=version_min[domain],v_submin=version_submin[domain])
-                        if do_point_timeseries and len(pt_locn_names[domain])>0:
-                            for iloc in range(len(pt_locn_names[domain])):
+                        if do_point_timeseries and len(pt_locns[domain].keys())>0:
+                            for iloc in range(len(pt_locns[domain].keys())):
                                 dat_rect_fixed_pt_ts[iloc].append(dat_rect_geotiff_interp_grid[pt_locn_locs_rc_fixed[domain][iloc][0],pt_locn_locs_rc_fixed[domain][iloc][1]])
                             pointplot_tsfile='' # dont need for geotiff/portal
 							
@@ -1574,7 +1583,16 @@ def process_realtime_v3(tnow,datadir,rt_dir,plotdir,scratchbase,lst_path,nflics_
     plt.close("all")
     if do_extended_core_calcs:
         # prevent the funnction from ending before the parallel work is completed, to prevent overlap with next file - no loss in time
-        pext.join()                                     
+        pext.join()      
+###########################################################
+#  function to get grid locations from  lat lon
+###########################################################
+def get_grid_from_ll(lats_ref, lons_ref, locs):
+    pt_locs=[]
+    for loc in locs.keys():
+       pt_locs.append([(np.abs(lats_ref-locs[loc][0])).argmin(),\
+                 (np.abs(lons_ref-locs[loc][1])).argmin()]) 
+    return(pt_locs)
 ###########################################################
 #  function to calculate the rain distributions given coefficients 
 ###########################################################
@@ -2893,8 +2911,8 @@ def pcalc_run(h, LSTA_array, table_path):
 def write_site_cores(csvfile,places,locs,anyblobs):
     with open(csvfile,'w') as ff:
         ff.write('Location,Latitude,Longitude,isCore\n')
-        for site in range(len(places)):
-            ff.write(','.join([places[site],str(locs[site][0]),str(locs[site][1]),str(int(anyblobs[site]))])+'\n') 
+        for isite,site in enumerate(places):
+            ff.write(','.join([site,str(locs[site][0]),str(locs[site][1]),str(int(anyblobs[isite]))])+'\n') 
 
 def plt_nflics_ts(forigin,ts,places,locs,plotfile,csvfile,filters,nhrs=6,fixed=False,writeType='w'):
 
